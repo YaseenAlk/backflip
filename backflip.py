@@ -108,7 +108,7 @@ def solve(board):
         # find the first empty square
         grid = cur_board['board']
         first_empty = grid.index(-1)
-        for possibility in [0,1,2]:
+        for possibility in [0,1,2,3]:
             grid[first_empty] = possibility
             cur_board['num_empty'] -= 1
             if not check_rules(cur_board):
