@@ -1,5 +1,3 @@
-from mimetypes import init
-
 
 ROW_SIZE = 5
 COL_SIZE = 5
@@ -72,8 +70,91 @@ def check_col_counts(board):
     
     return True
 
+LEVEL_TEMPLATES = {
+    # indices are (# Voltorbs, # 1s, # 2s, #3s)
+    1: [
+        (6,15,3,1),
+        (6,16,0,3),
+        (6,14,5,0),
+        (6,15,2,2),
+        (6,14,4,1),
+    ],
+
+    2: [
+        (7,14,1,3),
+        (7,12,6,0),
+        (7,13,3,2),
+        (7,14,0,4),
+        (7,12,5,1),
+    ],
+
+    3: [
+        (8,12,2,3),
+        (8,10,7,0),
+        (8,11,4,2),
+        (8,12,1,4),
+        (8,10,6,1),
+    ],
+
+    4: [
+        (8,11,3,3),
+        (8,12,0,5),
+        (10,7,8,0),
+        (10,8,5,2),
+        (10,9,2,4),
+    ],
+
+    5: [
+        (10,7,7,1),
+        (10,8,4,3),
+        (10,9,1,5),
+        (10,6,9,0),
+        (10,7,6,2),
+    ],
+
+    6: [
+        (10,8,3,4),
+        (10,9,0,6),
+        (10,6,8,1),
+        (10,7,5,3),
+        (10,8,2,5),
+    ],
+
+    7: [
+        (10,6,7,2),
+        (10,7,4,4),
+        (13,5,1,6),
+        (13,2,9,1),
+        (10,6,6,3),
+    ],
+
+    8: [
+        (10,8,0,7),
+        (10,5,8,2),
+        (10,6,5,4),
+        (10,7,2,6),
+        (10,5,7,3),
+    ],
+
+}
+
+def check_level_info(board):
+    # Heuristic 2: Each level selects from a set of template parameters, so we can't deviate from that and still be correct
+    # In particular, we know we deviate if our parameters can't work for any template
+    layouts = LEVEL_TEMPLATES[board['level']]
+    grid = board['board']
+    rvol, r1, r2, r3 = grid.count(0), grid.count(1), grid.count(2), grid.count(3)
+    for nvol, n1, n2, n3 in layouts:
+        if rvol > nvol or \
+            r1 > n1 or \
+                r2 > n2 or \
+                    r3 > n3:
+                    continue
+        return True
+    return False
+
 def check_rules(board):
-    rule_funcs = [check_row_counts, check_col_counts]
+    rule_funcs = [check_row_counts, check_col_counts, check_level_info]
     return all(rule(board) for rule in rule_funcs)
 
 def copy_board(inp):
@@ -147,6 +228,11 @@ def best_guess(initial, soln):
 if __name__ == "__main__":
     print('Welcome to Backflip')
     working_board = copy_board(STARTING_BOARD)
+    
+    lvl = int(input("Enter current level: "))
+    assert 1 <= lvl <= 8
+    working_board['level'] = lvl
+
     for i in range(COL_SIZE):
         nsum = int(input(f"row {i+1} nsum: "))
         nvol = int(input(f"row {i+1} nvol: "))
@@ -159,11 +245,39 @@ if __name__ == "__main__":
         assert 0 <= nsum <= 3*(COL_SIZE-nvol)
         assert 0 <= nvol <= COL_SIZE
         working_board['col_counts'].append((nsum, nvol))
+    
+    # Heuristic #1: any row/col with a voltorb count of 0 can be safely cleared
+    for i in range(COL_SIZE):
+        if working_board['row_counts'][i][1] == 0:
+            for j in range(ROW_SIZE):
+                idx = i*ROW_SIZE + j
+                v = int(input(f"What value do you see at index {idx+1}? (1-indexing): "))
+                assert v in [1,2,3]
+                update_board(working_board, idx, v)
+    for i in range(ROW_SIZE):
+        if working_board['col_counts'][i][1] == 0:
+            for j in range(COL_SIZE):
+                idx = j*ROW_SIZE + i
+                v = int(input(f"What value do you see at index {idx+1}? (1-indexing): "))
+                assert v in [1,2,3]
+                update_board(working_board, idx, v)
+
+    print("Now for other squares you've already tapped.")
+    others = input("Enter index,value (row-major 1-indexing) or n if done: ")
+    while not others.lower().startswith('n'):
+        idx,val = others.split(',')
+        idx = int(idx)
+        val = int(val)
+        assert 1 <= idx <= 25
+        assert val in [1,2,3]
+        update_board(working_board, idx, val)
+        others = input("Enter index,value (row-major 1-indexing) or n if done: ")
+
     initial_board = copy_board(working_board)
     while working_board['num_empty'] > 0:
         next_guess = best_guess(initial_board, solve(working_board))
-        idx, prob = next_guess
-        next_val = input(f"What value do you see at index {idx+1}? (1-indexing) ({prob*100}% chance of being a voltorb): ")
+        idx, prob = next_guess 
+        next_val = input(f"What value do you see at index {idx+1}? (row-major 1-indexing) ({prob*100}% chance of being a voltorb): ")
         val = int(next_val)
         assert(val in [0,1,2,3])
         if val == 0:
